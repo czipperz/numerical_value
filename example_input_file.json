@@ -1,0 +1,85 @@
+{
+"nodes": [
+{ "key": "SourceFile([292..458))", "value":
+{ "type": "other" }
+,
+"successors": [
+{ "key": "SourceFile([319..329))", "value": -1 }]
+},
+{ "key": "SourceFile([319..329))", "value":
+{ "type": "variable_declaration",
+  "declarations": [
+    { "identifier": "i", "initializer": 0 }
+  ] }
+,
+"successors": [
+{ "key": "SourceFile([335..341))", "value": -1 }]
+},
+{ "key": "SourceFile([335..341))", "value":
+{ "type": "variable_assignment",
+  "left": "i",
+  "op": "=",
+  "right": 3
+}
+,
+"successors": [
+{ "key": "SourceFile([347..359))", "value": -1 }]
+},
+{ "key": "SourceFile([347..359))", "value":
+{ "type": "variable_declaration",
+  "declarations": [
+    { "identifier": "j", "initializer": null }
+  ] }
+,
+"successors": [
+{ "key": "SourceFile([369..374))", "value": -1 }]
+},
+{ "key": "SourceFile([369..374))", "value":
+{ "type": "comparison",
+  "left": "j",
+  "op": ">",
+  "right": 5
+}
+,
+"successors": [
+{ "key": "SourceFile([379..386))", "value": 1 }, { "key": "SourceFile([429..435))", "value": 0 }]
+},
+{ "key": "SourceFile([379..386))", "value":
+{ "type": "other" }
+,
+"successors": [
+{ "key": "SourceFile([399..405))", "value": 0 }, { "key": "SourceFile([429..435))", "value": 1 }]
+},
+{ "key": "SourceFile([399..405))", "value":
+{ "type": "variable_assignment",
+  "left": "i",
+  "op": "=",
+  "right": 4
+}
+,
+"successors": [
+{ "key": "SourceFile([448..455))", "value": -1 }]
+},
+{ "key": "SourceFile([448..455))", "value":
+{ "type": "other" }
+,
+"successors": [
+{ "key": "SourceFile([0..7))", "value": -1 }]
+},
+{ "key": "SourceFile([0..7))", "value":
+{ "type": "other" }
+,
+"successors": [
+]
+},
+{ "key": "SourceFile([429..435))", "value":
+{ "type": "variable_assignment",
+  "left": "i",
+  "op": "=",
+  "right": 5
+}
+,
+"successors": [
+{ "key": "SourceFile([448..455))", "value": -1 }]
+}
+] }
