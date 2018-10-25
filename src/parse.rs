@@ -5,6 +5,7 @@ use std::fs::File;
 use std::io;
 use std::io::prelude::*;
 use std::collections::HashMap;
+use std::fmt;
 
 #[derive(Deserialize, Debug)]
 struct Nodes {
@@ -49,7 +50,6 @@ fn read_file() -> io::Result<String> {
     Ok(contents)
 }
 
-#[derive(Debug)]
 pub struct Graph {
     values: HashMap<String, NodeValue>,
     successors: HashMap<String, Vec<Successor>>,
@@ -60,6 +60,18 @@ impl Graph {
     }
     fn successors_of(&self, s: &str) -> Option<&Vec<Successor>> {
         self.successors.get(s)
+    }
+}
+impl fmt::Debug for Graph {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "Graph {{")?;
+        for k in self.values.keys() {
+            writeln!(f, "  {} ->\n    {:?}", k, self.values.get(k).unwrap())?;
+            for s in self.successors.get(k).unwrap() {
+                writeln!(f, "    {:?}", s)?;
+            }
+        }
+        writeln!(f, "}}")
     }
 }
 
