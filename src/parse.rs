@@ -7,17 +7,17 @@ use std::io::prelude::*;
 use std::collections::HashMap;
 use std::fmt;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 struct Nodes {
     nodes: Vec<Node>,
 }
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 struct Node {
     key: String,
     value: NodeValue,
     successors: Vec<Successor>,
 }
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 pub enum NodeValue {
@@ -26,22 +26,22 @@ pub enum NodeValue {
     Comparison { left: Expression, op: String, right: Expression },
     Other,
 }
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct Declaration {
-    identifier: String,
-    initializer: Expression,
+    pub identifier: String,
+    pub initializer: Expression,
 }
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum Expression {
     Number(i64),
     Identifier(String),
     Other,
 }
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct Successor {
-    key: String,
-    value: i64,
+    pub key: String,
+    pub value: i64,
 }
 
 fn read_file() -> io::Result<String> {
@@ -53,13 +53,17 @@ fn read_file() -> io::Result<String> {
 pub struct Graph {
     values: HashMap<String, NodeValue>,
     successors: HashMap<String, Vec<Successor>>,
+    first: String,
 }
 impl Graph {
-    fn value_of(&self, s: &str) -> Option<&NodeValue> {
+    pub fn value_of(&self, s: &str) -> Option<&NodeValue> {
         self.values.get(s)
     }
-    fn successors_of(&self, s: &str) -> Option<&Vec<Successor>> {
+    pub fn successors_of(&self, s: &str) -> Option<&Vec<Successor>> {
         self.successors.get(s)
+    }
+    pub fn first(&self) -> &String {
+        &self.first
     }
 }
 impl fmt::Debug for Graph {
@@ -83,9 +87,10 @@ pub fn parse_contents(contents: String) -> io::Result<Graph> {
     let nodes: Nodes = serde_json::from_str(&contents)?;
     let mut values = HashMap::new();
     let mut successors = HashMap::new();
+    let first = nodes.nodes[0].key.clone();
     for node in nodes.nodes.into_iter() {
         values.insert(node.key.clone(), node.value);
         successors.insert(node.key, node.successors);
     }
-    Ok(Graph { values, successors })
+    Ok(Graph { values, successors, first })
 }
