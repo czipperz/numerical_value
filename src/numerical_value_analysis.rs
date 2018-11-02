@@ -23,17 +23,15 @@ fn numerical_value_analysis(graph: &Graph, node_string: &str,
             let mut any_changed = false;
             for (key, value) in node_string_history {
                 if variables.contains_key(key) {
-                    match {
+                    let (new_var, eq) = {
                         let var = &variables[key];
                         let new_var = var.union(value);
                         let eq = *var != new_var;
                         (new_var, eq)
-                    } {
-                        (new_var, true) => {
-                            variables.insert(key.clone(), new_var);
-                            any_changed = true;
-                        },
-                        _ => {},
+                    };
+                    if eq {
+                        variables.insert(key.clone(), new_var);
+                        any_changed = true;
                     }
                 } else {
                     variables.insert(key.clone(), value.clone());
