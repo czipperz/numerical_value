@@ -8,22 +8,22 @@ pub struct NumericalValue<T> {
     ranges: BTreeSet<Range<T>>,
 }
 
-#[derive(PartialEq, Eq, Clone)]
-struct Range<T> {
-    min: MinPair<T>,
-    max: MaxPair<T>,
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub struct Range<T> {
+    pub min: MinPair<T>,
+    pub max: MaxPair<T>,
 }
 
-#[derive(PartialEq, Eq, Clone)]
-struct MinPair<T> {
-    value: T,
-    inclusivity: Inclusivity,
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub struct MinPair<T> {
+    pub value: T,
+    pub inclusivity: Inclusivity,
 }
 
-#[derive(PartialEq, Eq, Clone)]
-struct MaxPair<T> {
-    value: T,
-    inclusivity: Inclusivity,
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub struct MaxPair<T> {
+    pub value: T,
+    pub inclusivity: Inclusivity,
 }
 
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -37,8 +37,7 @@ impl<T: Ord> NumericalValue<T> {
     }
 
     pub fn new_value(min_v: T, min_i: Inclusivity, max_v: T, max_i: Inclusivity) -> Self {
-        let mut v = NumericalValue::new();
-        v.ranges.insert(Range {
+        NumericalValue::from(Range {
             min: MinPair {
                 value: min_v,
                 inclusivity: min_i,
@@ -47,11 +46,26 @@ impl<T: Ord> NumericalValue<T> {
                 value: max_v,
                 inclusivity: max_i,
             },
-        });
-        v
+        })
     }
 }
+
 impl<T> NumericalValue<T> where T: Ord, T: Clone {
+    pub fn range(&self) -> Option<Range<T>> {
+        match (self.min(), self.max()) {
+            (Some(min), Some(max)) => Some(Range { min, max }),
+            _ => None,
+        }
+    }
+
+    pub fn min(&self) -> Option<MinPair<T>> {
+        self.ranges.iter().next().map(|r| r.min.clone())
+    }
+
+    pub fn max(&self) -> Option<MaxPair<T>> {
+        self.ranges.iter().next_back().map(|r| r.max.clone())
+    }
+
     pub fn union(&self, other: &Self) -> Self {
         let mut other = other.ranges.iter().fuse();
         let mut working_other = None;
@@ -158,9 +172,23 @@ impl<T> NumericalValue<T> where T: Ord, T: Clone {
     pub fn union_value(&self, min_v: T, min_i: Inclusivity, max_v: T, max_i: Inclusivity) -> Self {
         self.union(&NumericalValue::new_value(min_v, min_i, max_v, max_i))
     }
+}
 
+impl<'a, T: 'a> NumericalValue<T> where T: Ord + Clone {
     pub fn intersect(&self, other: &Self) -> Self {
-        let mut other = other.ranges.iter().fuse();
+        self.intersect_impl(other.ranges.iter().fuse())
+    }
+
+    pub fn intersect_range(&self, range: &Range<T>) -> Self {
+        use std::iter;
+        self.intersect_impl(iter::once(range))
+    }
+
+    pub fn intersect_value(&self, min_v: T, min_i: Inclusivity, max_v: T, max_i: Inclusivity) -> Self {
+        self.intersect(&NumericalValue::new_value(min_v, min_i, max_v, max_i))
+    }
+
+    fn intersect_impl<I>(&self, mut other: I) -> Self where I: Iterator<Item = &'a Range<T>> {
         let mut working_other = other.next().cloned();
         let mut new_ranges = BTreeSet::<Range<T>>::new();
         for r in self.ranges.iter() {
@@ -220,15 +248,60 @@ impl<T> NumericalValue<T> where T: Ord, T: Clone {
         }
         NumericalValue { ranges: new_ranges }
     }
+}
 
-    pub fn intersect_value(&self, min_v: T, min_i: Inclusivity, max_v: T, max_i: Inclusivity) -> Self {
-        self.intersect(&NumericalValue::new_value(min_v, min_i, max_v, max_i))
+impl<T> Range<T> {
+    pub fn new(min_v: T, min_i: Inclusivity, max_v: T, max_i: Inclusivity) -> Self {
+        Range {
+            min: MinPair { value: min_v, inclusivity: min_i, },
+            max: MaxPair { value: max_v, inclusivity: max_i, },
+        }
+    }
+}
+impl<T> Range<T> where T: MinMax {
+    pub fn universe() -> Self {
+        Range::new(T::min_value(), Inclusivity::Inclusive,
+                   T::max_value(), Inclusivity::Inclusive)
+    }
+}
+impl<T> Range<T> where T: MinMax + Clone {
+    pub fn before(&self) -> Range<T> {
+        Range::new(T::min_value(), Inclusivity::Inclusive,
+                   self.min.value.clone(), self.min.inclusivity.flip())
+    }
+
+    pub fn after(&self) -> Range<T> {
+        Range::new(self.max.value.clone(), self.max.inclusivity.flip(),
+                   T::max_value(), Inclusivity::Inclusive)
+    }
+
+    pub fn inverse(&self) -> (Range<T>, Range<T>) {
+        (self.before(), self.after())
     }
 }
 
-pub trait MinMax<T = Self> {
-    fn min_value() -> T;
-    fn max_value() -> T;
+impl<T> From<T> for Range<T> where T: Clone {
+    fn from(t: T) -> Self {
+        let tp = t.clone();
+        Range::new(t, Inclusivity::Inclusive, tp, Inclusivity::Inclusive)
+    }
+}
+impl<T> From<Range<T>> for NumericalValue<T> where T: Ord {
+    fn from(range: Range<T>) -> Self {
+        let mut v = NumericalValue::new();
+        v.ranges.insert(range);
+        v
+    }
+}
+impl<T> From<T> for NumericalValue<T> where T: Ord + Clone {
+    fn from(t: T) -> Self {
+        NumericalValue::new_value(t.clone(), Inclusivity::Inclusive, t, Inclusivity::Inclusive)
+    }
+}
+
+pub trait MinMax {
+    fn min_value() -> Self;
+    fn max_value() -> Self;
 }
 
 impl MinMax for i32 {
@@ -236,7 +309,12 @@ impl MinMax for i32 {
     fn max_value() -> Self { i32::max_value() }
 }
 
-impl<T> NumericalValue<T> where T: MinMax<T>, T: Ord, T: Clone {
+impl MinMax for i64 {
+    fn min_value() -> Self { i64::min_value() }
+    fn max_value() -> Self { i64::max_value() }
+}
+
+impl<T> NumericalValue<T> where T: MinMax, T: Ord, T: Clone {
     pub fn inverse(&self) -> Self {
         use Inclusivity::*;
         
@@ -263,10 +341,65 @@ impl<T> NumericalValue<T> where T: MinMax<T>, T: Ord, T: Clone {
         }
         NumericalValue { ranges: new_ranges }
     }
+
+    pub fn universe() -> Self {
+        NumericalValue::new_value(T::min_value(), Inclusivity::Inclusive,
+                                  T::max_value(), Inclusivity::Inclusive)
+    }
+}
+
+impl<T> MinPair<T> {
+    pub fn flip_inclusivity(self) -> Self {
+        MinPair {
+            value: self.value,
+            inclusivity: self.inclusivity.flip(),
+        }
+    }
+}
+
+impl<T> MaxPair<T> {
+    pub fn flip_inclusivity(self) -> Self {
+        MaxPair {
+            value: self.value,
+            inclusivity: self.inclusivity.flip(),
+        }
+    }
+}
+
+impl<T> MinPair<T> where T: MinMax {
+    pub fn after_eq(self) -> Range<T> {
+        Range {
+            min: self,
+            max: MaxPair { value: T::max_value(),
+                           inclusivity: Inclusivity::Inclusive },
+        }
+    }
+
+    pub fn after(self) -> Range<T> {
+        let mut range = self.after_eq();
+        range.min.inclusivity = range.min.inclusivity.flip();
+        range
+    }
+}
+
+impl<T> MaxPair<T> where T: MinMax {
+    pub fn before_eq(self) -> Range<T> {
+        Range {
+            min: MinPair { value: T::min_value(),
+                           inclusivity: Inclusivity::Inclusive },
+            max: self,
+        }
+    }
+
+    pub fn before(self) -> Range<T> {
+        let mut range = self.before_eq();
+        range.max.inclusivity = range.max.inclusivity.flip();
+        range
+    }
 }
 
 impl Inclusivity {
-    fn flip(&self) -> Self {
+    pub fn flip(&self) -> Self {
         use Inclusivity::*;
         match self {
             Inclusive => Exclusive,
@@ -314,7 +447,7 @@ impl<T: fmt::Debug> fmt::Debug for Range<T> {
 impl<T: Ord> Ord for Range<T> {
     fn cmp(&self, other: &Self) -> Ordering {
         let min_ord = self.min.cmp(&other.min);
-        if (min_ord == Ordering::Equal) {
+        if min_ord == Ordering::Equal {
             self.max.cmp(&other.max)
         } else {
             min_ord
@@ -511,5 +644,14 @@ mod tests {
             .union_value(1, Inclusive, 3, Inclusive);
         assert_eq!(format!("{:?}", value), "(-7, -2) U [1, 3]");
         assert_eq!(format!("{:?}", value.inverse()), "[-2147483648, -7] U [-2, 1) U (3, 2147483647]");
+    }
+
+    #[test]
+    fn integration_test() {
+        let value = NumericalValue::new_value(-3, Exclusive, 4, Inclusive);
+        let range = value.range().unwrap();
+        assert_eq!(format!("{:?}", range), format!("{:?}", value));
+        assert_eq!(format!("{:?}", range.before()), "[-2147483648, -3]");
+        assert_eq!(format!("{:?}", range.after()), "(4, 2147483647]");
     }
 }

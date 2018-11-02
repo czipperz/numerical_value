@@ -1,6 +1,6 @@
 {
 "nodes": [
-{ "key": "SourceFile([292..458))", "value":
+{ "key": "SourceFile([292..450))", "value":
 { "type": "other" }
 ,
 "successors": [
@@ -18,7 +18,6 @@
 { "key": "SourceFile([335..341))", "value":
 { "type": "variable_assignment",
   "left": "i",
-  "op": "=",
   "right": 3
 }
 ,
@@ -32,35 +31,28 @@
   ] }
 ,
 "successors": [
-{ "key": "SourceFile([369..374))", "value": -1 }]
+{ "key": "SourceFile([369..378))", "value": -1 }]
 },
-{ "key": "SourceFile([369..374))", "value":
+{ "key": "SourceFile([369..378))", "value":
 { "type": "comparison",
-  "left": "j",
+  "left": { "left": "j", "op": "+", "right": "j" },
   "op": ">",
   "right": 5
 }
 ,
 "successors": [
-{ "key": "SourceFile([379..386))", "value": 1 }, { "key": "SourceFile([429..435))", "value": 0 }]
+{ "key": "SourceFile([391..397))", "value": 1 }, { "key": "SourceFile([421..427))", "value": 0 }]
 },
-{ "key": "SourceFile([379..386))", "value":
-{ "type": "other" }
-,
-"successors": [
-{ "key": "SourceFile([399..405))", "value": 0 }, { "key": "SourceFile([429..435))", "value": 1 }]
-},
-{ "key": "SourceFile([399..405))", "value":
+{ "key": "SourceFile([391..397))", "value":
 { "type": "variable_assignment",
   "left": "i",
-  "op": "=",
-  "right": 4
+  "right": "j"
 }
 ,
 "successors": [
-{ "key": "SourceFile([448..455))", "value": -1 }]
+{ "key": "SourceFile([440..447))", "value": -1 }]
 },
-{ "key": "SourceFile([448..455))", "value":
+{ "key": "SourceFile([440..447))", "value":
 { "type": "other" }
 ,
 "successors": [
@@ -72,14 +64,13 @@
 "successors": [
 ]
 },
-{ "key": "SourceFile([429..435))", "value":
+{ "key": "SourceFile([421..427))", "value":
 { "type": "variable_assignment",
   "left": "i",
-  "op": "=",
   "right": 5
 }
 ,
 "successors": [
-{ "key": "SourceFile([448..455))", "value": -1 }]
+{ "key": "SourceFile([440..447))", "value": -1 }]
 }
 ] }

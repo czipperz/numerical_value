@@ -22,7 +22,7 @@ struct Node {
 #[serde(rename_all = "snake_case")]
 pub enum NodeValue {
     VariableDeclaration { declarations: Vec<Declaration> },
-    VariableAssignment { left: Expression, op: String, right: Expression },
+    VariableAssignment { left: /*Expression, op:*/ String, right: Expression },
     Comparison { left: Expression, op: String, right: Expression },
     Other,
 }
@@ -34,6 +34,7 @@ pub struct Declaration {
 #[derive(Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum Expression {
+    Binary { left: Box<Expression>, op: String, right: Box<Expression> },
     Number(i64),
     Identifier(String),
     Other,
@@ -45,8 +46,9 @@ pub struct Successor {
 }
 
 fn read_file() -> io::Result<String> {
+    use std::env;
     let mut contents = String::new();
-    File::open("../input_file.json")?.read_to_string(&mut contents)?;
+    File::open(env::args().nth(1).unwrap())?.read_to_string(&mut contents)?;
     Ok(contents)
 }
 
@@ -56,6 +58,13 @@ pub struct Graph {
     first: String,
 }
 impl Graph {
+    #[cfg(test)]
+    pub fn new(values: HashMap<String, NodeValue>,
+               successors: HashMap<String, Vec<Successor>>,
+               first: String) -> Self {
+        Graph { values, successors, first }
+    }
+
     pub fn value_of(&self, s: &str) -> Option<&NodeValue> {
         self.values.get(s)
     }
