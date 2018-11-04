@@ -281,7 +281,7 @@ fn handle_comparison(left: &Expression, op: &str, right: &Expression,
     let l = parse_value_expression(left, variables);
     let r = parse_value_expression(right, variables);
     descend(left, r.range().unwrap(), op, variables, slices);
-    descend(right, l.range().unwrap(), op, variables, slices);
+    descend(right, l.range().unwrap(), op.flip(), variables, slices);
 }
 
 #[cfg(test)]
@@ -560,6 +560,52 @@ mod tests {
 
     #[test]
     fn handle_comparison_11() {
+        use Expression::*;
+        let mut variables = HashMap::new();
+        variables.insert("a".to_string(), NumericalValue::universe());
+        let mut slices = Vec::new();
+        // 32 <= a / 4
+        // a >= 128
+        handle_comparison(&Number(32),
+                          "<=",
+                          &Binary { left: Box::new(Identifier("a".to_string())),
+                                    op: "/".to_string(),
+                                    right: Box::new(Number(4)), },
+                          &variables, &mut slices);
+        assert_eq!(slices,
+                   vec![VariableValueSlice {
+                       name: "a".to_string(),
+                       pass: Range::new(BoundedValue::Raw(128), Inclusivity::Inclusive,
+                                        BoundedValue::Max, Inclusivity::Inclusive),
+                       fail: Range::new(BoundedValue::Min, Inclusivity::Inclusive,
+                                        BoundedValue::Raw(128), Inclusivity::Exclusive),
+                   }]);
+    }
+
+    #[test]
+    fn handle_comparison_12() {
+        use Expression::*;
+        let mut variables = HashMap::new();
+        variables.insert("a".to_string(), NumericalValue::universe());
+        let mut slices = Vec::new();
+        // 4 != 32 / a
+        // a != 8
+        handle_comparison(&Number(4),
+                          "!=",
+                          &Binary { left: Box::new(Number(32)),
+                                    op: "/".to_string(),
+                                    right: Box::new(Identifier("a".to_string())) },
+                          &variables, &mut slices);
+        assert_eq!(slices,
+                   vec![VariableValueSlice {
+                       name: "a".to_string(),
+                       pass: Range::universe(),
+                       fail: Range::from(BoundedValue::Raw(8)),
+                   }]);
+    }
+
+    #[test]
+    fn handle_comparison_13() {
         use Expression::*;
         let mut variables = HashMap::new();
         variables.insert("a".to_string(), NumericalValue::universe());
