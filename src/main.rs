@@ -13,6 +13,11 @@ use parse::*;
 extern crate serde_derive;
 
 fn main() {
-    let graph = parse().unwrap();
-    analyze(&graph);
+    match parse() {
+        Ok(graph) => analyze(&graph),
+        Err(e) => {
+            eprintln!("error: {}", e);
+            std::process::exit(1);
+        },
+    }
 }

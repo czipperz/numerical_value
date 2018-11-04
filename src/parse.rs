@@ -48,7 +48,9 @@ pub struct Successor {
 fn read_file() -> io::Result<String> {
     use std::env;
     let mut contents = String::new();
-    File::open(env::args().nth(1).unwrap())?.read_to_string(&mut contents)?;
+    let err = io::Error::new(io::ErrorKind::InvalidInput, "No file in argument");
+    File::open(env::args().nth(1).ok_or(err)?)?
+        .read_to_string(&mut contents)?;
     Ok(contents)
 }
 
