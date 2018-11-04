@@ -43,9 +43,9 @@ impl Add for BoundedValue<i64> {
             (Max, Min) => unimplemented!(),
             (Max, Raw(_)) => Max,
             (Max, Max) => Max,
-            (Raw(a), Min) => Min,
+            (Raw(_), Min) => Min,
             (Raw(a), Raw(b)) => Raw(a + b),
-            (Raw(a), Max) => Max,
+            (Raw(_), Max) => Max,
         }
     }
 }
@@ -103,9 +103,9 @@ impl Div for BoundedValue<i64> {
                 else { Min }
             },
             (Max, Max) => Max,
-            (Raw(a), Min) => Raw(0),
+            (Raw(_), Min) => Raw(0),
             (Raw(a), Raw(b)) => Raw(a / b),
-            (Raw(a), Max) => Raw(0),
+            (Raw(_), Max) => Raw(0),
         }
     }
 }

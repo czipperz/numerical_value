@@ -348,56 +348,6 @@ impl<T> NumericalValue<T> where T: MinMax, T: Ord, T: Clone {
     }
 }
 
-impl<T> MinPair<T> {
-    pub fn flip_inclusivity(self) -> Self {
-        MinPair {
-            value: self.value,
-            inclusivity: self.inclusivity.flip(),
-        }
-    }
-}
-
-impl<T> MaxPair<T> {
-    pub fn flip_inclusivity(self) -> Self {
-        MaxPair {
-            value: self.value,
-            inclusivity: self.inclusivity.flip(),
-        }
-    }
-}
-
-impl<T> MinPair<T> where T: MinMax {
-    pub fn after_eq(self) -> Range<T> {
-        Range {
-            min: self,
-            max: MaxPair { value: T::max_value(),
-                           inclusivity: Inclusivity::Inclusive },
-        }
-    }
-
-    pub fn after(self) -> Range<T> {
-        let mut range = self.after_eq();
-        range.min.inclusivity = range.min.inclusivity.flip();
-        range
-    }
-}
-
-impl<T> MaxPair<T> where T: MinMax {
-    pub fn before_eq(self) -> Range<T> {
-        Range {
-            min: MinPair { value: T::min_value(),
-                           inclusivity: Inclusivity::Inclusive },
-            max: self,
-        }
-    }
-
-    pub fn before(self) -> Range<T> {
-        let mut range = self.before_eq();
-        range.max.inclusivity = range.max.inclusivity.flip();
-        range
-    }
-}
-
 impl Inclusivity {
     pub fn flip(&self) -> Self {
         use Inclusivity::*;
