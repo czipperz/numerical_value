@@ -11,10 +11,15 @@ use parse::*;
 
 #[macro_use]
 extern crate serde_derive;
+extern crate serde_json;
 
 fn main() {
     match parse() {
-        Ok(graph) => analyze(&graph),
+        Ok(graph) => {
+            let diagnostics = analyze(&graph);
+            let diagnostics: String = serde_json::to_string(&diagnostics).unwrap();
+            println!("{}", diagnostics);
+        },
         Err(e) => {
             eprintln!("error: {}", e);
             std::process::exit(1);

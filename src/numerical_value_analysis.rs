@@ -2,9 +2,19 @@ use std::collections::HashMap;
 use parse::*;
 use numerical_value::*;
 use bounded_value::*;
+extern crate serde;
+extern crate serde_json;
 
-pub fn analyze(graph: &Graph) {
-    numerical_value_analysis(graph, graph.first(), &mut HashMap::new(), &mut HashMap::new());
+#[derive(Debug, Serialize)]
+pub struct Diagnostic {
+    location: String,
+    message: String,
+}
+
+pub fn analyze(graph: &Graph) -> Vec<Diagnostic> {
+    let mut diagnostics = Vec::new();
+    numerical_value_analysis(graph, graph.first(), &mut HashMap::new(), &mut HashMap::new(), &mut diagnostics);
+    diagnostics
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -16,7 +26,8 @@ struct VariableValueSlice<T> {
 
 fn numerical_value_analysis(graph: &Graph, node_string: &str,
                             variables: &mut HashMap<String, NumericalValue<BoundedValue<i64>>>,
-                            history: &mut HashMap<String, HashMap<String, NumericalValue<BoundedValue<i64>>>>) {
+                            history: &mut HashMap<String, HashMap<String, NumericalValue<BoundedValue<i64>>>>,
+                            diagnostics: &mut Vec<Diagnostic>) {
     let node = graph.value_of(node_string).unwrap();
     match history.get(node_string) {
         Some(node_string_history) => {
@@ -62,7 +73,7 @@ fn numerical_value_analysis(graph: &Graph, node_string: &str,
             variables.insert(left.clone(), parsed);
         },
         NodeValue::Comparison { left, op, right } => {
-            handle_comparison(left, op, right, variables, &mut slices);
+            handle_comparison(node_string, left, op, right, variables, &mut slices, diagnostics);
         },
         NodeValue::Other => {},
     }
@@ -78,7 +89,7 @@ fn numerical_value_analysis(graph: &Graph, node_string: &str,
                 else { unreachable!() });
             vars.insert(slice.name.clone(), new_var);
         }
-        numerical_value_analysis(graph, &succ.key, &mut vars, history);
+        numerical_value_analysis(graph, &succ.key, &mut vars, history, diagnostics);
     }
 }
 
@@ -265,9 +276,10 @@ fn descend(expr: &Expression, range: Range<BoundedValue<i64>>, cmp_op: Compariso
     }
 }
 
-fn handle_comparison(left: &Expression, op: &str, right: &Expression,
+fn handle_comparison(node_string: &str, left: &Expression, op: &str, right: &Expression,
                      variables: &HashMap<String, NumericalValue<BoundedValue<i64>>>,
-                     slices: &mut Vec<VariableValueSlice<BoundedValue<i64>>>) {
+                     slices: &mut Vec<VariableValueSlice<BoundedValue<i64>>>,
+                     diagnostics: &mut Vec<Diagnostic>) {
     use self::ComparisonOperator::*;
     let op = match op {
         "<" => Less,
@@ -280,8 +292,38 @@ fn handle_comparison(left: &Expression, op: &str, right: &Expression,
     };
     let l = parse_value_expression(left, variables);
     let r = parse_value_expression(right, variables);
-    descend(left, r.range().unwrap(), op, variables, slices);
-    descend(right, l.range().unwrap(), op.flip(), variables, slices);
+    let l = l.range().unwrap();
+    let r = r.range().unwrap();
+    descend(left, r, op, variables, slices);
+    descend(right, l, op.flip(), variables, slices);
+    let always_true = match op {
+        Less => l.max < r.min,
+        LessEqual => l.max <= r.min,
+        Greater => l.min > r.max,
+        GreaterEqual => l.min >= r.max,
+        Equals => l == r,
+        NotEquals => l.max < r.min || l.min > r.max,
+    };
+    let always_false = match op {
+        Less => l.min > r.max,
+        LessEqual => l.min >= r.max,
+        Greater => l.max < r.min,
+        GreaterEqual => l.max <= r.min,
+        Equals => l.max < r.min || l.min > r.max,
+        NotEquals => l == r,
+    };
+    if always_true {
+        diagnostics.push(Diagnostic {
+            location: node_string.to_string(),
+            message: "Expression is always true".to_string(),
+        });
+    }
+    if always_false {
+        diagnostics.push(Diagnostic {
+            location: node_string.to_string(),
+            message: "Expression is always false".to_string(),
+        });
+    }
 }
 
 #[cfg(test)]
@@ -342,7 +384,8 @@ mod tests {
         let mut variables = HashMap::new();
         variables.insert("a".to_string(), NumericalValue::universe());
         let mut slices = Vec::new();
-        handle_comparison(&Identifier("a".to_string()), "<", &Number(130), &variables, &mut slices);
+        let mut diagnostics = Vec::new();
+        handle_comparison(&Identifier("a".to_string()), "<", &Number(130), &variables, &mut slices, &mut diagnostics);
         assert_eq!(slices,
                    vec![VariableValueSlice {
                        name: "a".to_string(),
@@ -351,6 +394,7 @@ mod tests {
                        fail: Range::new(BoundedValue::Raw(130), Inclusivity::Inclusive,
                                         BoundedValue::Max, Inclusivity::Inclusive),
                    }]);
+        assert_eq!(diagnostics, vec![]);
     }
 
     #[test]
@@ -418,10 +462,11 @@ mod tests {
         let mut variables = HashMap::new();
         variables.insert("a".to_string(), NumericalValue::universe());
         let mut slices = Vec::new();
-        handle_comparison(&Binary { left: Box::new(Number(10)),
+        let mut diagnostics = Vec::new();
+        handle_comparison("pos", &Binary { left: Box::new(Number(10)),
                                     op: "-".to_string(),
                                     right: Box::new(Identifier("a".to_string())), },
-                          ">", &Number(32), &variables, &mut slices);
+                          ">", &Number(32), &variables, &mut slices, &mut diagnostics);
         // 10 - a > 32
         // a < -22
         assert_eq!(slices,
@@ -432,6 +477,7 @@ mod tests {
                        fail: Range::new(BoundedValue::Raw(-22), Inclusivity::Inclusive,
                                         BoundedValue::Max, Inclusivity::Inclusive),
                    }]);
+        assert!(diagnostics.is_empty());
     }
 
     #[test]
@@ -439,14 +485,14 @@ mod tests {
         use Expression::*;
         let mut variables = HashMap::new();
         variables.insert("a".to_string(), NumericalValue::universe());
-
         // 4 * a <= 32
         // a <= 8
         let mut slices = Vec::new();
-        handle_comparison(&Binary { left: Box::new(Number(4)),
+        let mut diagnostics = Vec::new();
+        handle_comparison("pos", &Binary { left: Box::new(Number(4)),
                                     op: "*".to_string(),
                                     right: Box::new(Identifier("a".to_string())), },
-                          "<=", &Number(32), &variables, &mut slices);
+                          "<=", &Number(32), &variables, &mut slices, &mut diagnostics);
         assert_eq!(slices,
                    vec![VariableValueSlice {
                        name: "a".to_string(),
@@ -455,14 +501,22 @@ mod tests {
                        fail: Range::new(BoundedValue::Raw(8), Inclusivity::Exclusive,
                                         BoundedValue::Max, Inclusivity::Inclusive),
                    }]);
+        assert!(diagnostics.is_empty());
+    }
 
+    #[test]
+    fn handle_comparison_6_2() {
+        use Expression::*;
+        let mut variables = HashMap::new();
+        variables.insert("a".to_string(), NumericalValue::universe());
+        let mut slices = Vec::new();
+        let mut diagnostics = Vec::new();
         // a * 4 <= 32
         // a <= 8
-        slices.clear();
-        handle_comparison(&Binary { left: Box::new(Number(4)),
+        handle_comparison("pos", &Binary { left: Box::new(Number(4)),
                                     op: "*".to_string(),
                                     right: Box::new(Identifier("a".to_string())), },
-                          "<=", &Number(32), &variables, &mut slices);
+                          "<=", &Number(32), &variables, &mut slices, &mut diagnostics);
         assert_eq!(slices,
                    vec![VariableValueSlice {
                        name: "a".to_string(),
@@ -471,6 +525,7 @@ mod tests {
                        fail: Range::new(BoundedValue::Raw(8), Inclusivity::Exclusive,
                                         BoundedValue::Max, Inclusivity::Inclusive),
                    }]);
+        assert!(diagnostics.is_empty());
     }
 
     #[test]
@@ -479,13 +534,14 @@ mod tests {
         let mut variables = HashMap::new();
         variables.insert("a".to_string(), NumericalValue::universe());
         let mut slices = Vec::new();
-        // 32 / a >= [4, 8]
-        // a <= 32 / [4, 8]
-        // a <= [4, 8]
-        handle_comparison(&Binary { left: Box::new(Number(32)),
+        let mut diagnostics = Vec::new();
+        // 32 / a >= 4
+        // a <= 32 / 4
+        // a <= 8
+        handle_comparison("pos", &Binary { left: Box::new(Number(32)),
                                     op: "/".to_string(),
                                     right: Box::new(Identifier("a".to_string())), },
-                          ">=", &Number(4), &variables, &mut slices);
+                          ">=", &Number(4), &variables, &mut slices, &mut diagnostics);
         assert_eq!(slices,
                    vec![VariableValueSlice {
                        name: "a".to_string(),
@@ -494,6 +550,7 @@ mod tests {
                        fail: Range::new(BoundedValue::Raw(8), Inclusivity::Exclusive,
                                         BoundedValue::Max, Inclusivity::Inclusive),
                    }]);
+        assert!(diagnostics.is_empty());
     }
 
     #[test]
@@ -502,12 +559,13 @@ mod tests {
         let mut variables = HashMap::new();
         variables.insert("a".to_string(), NumericalValue::universe());
         let mut slices = Vec::new();
+        let mut diagnostics = Vec::new();
         // a / 4 <= 32
         // a <= 128
-        handle_comparison(&Binary { left: Box::new(Identifier("a".to_string())),
+        handle_comparison("pos", &Binary { left: Box::new(Identifier("a".to_string())),
                                     op: "/".to_string(),
                                     right: Box::new(Number(4)), },
-                          "<=", &Number(32), &variables, &mut slices);
+                          "<=", &Number(32), &variables, &mut slices, &mut diagnostics);
         assert_eq!(slices,
                    vec![VariableValueSlice {
                        name: "a".to_string(),
@@ -516,6 +574,7 @@ mod tests {
                        fail: Range::new(BoundedValue::Raw(128), Inclusivity::Exclusive,
                                         BoundedValue::Max, Inclusivity::Inclusive),
                    }]);
+        assert!(diagnostics.is_empty());
     }
 
     #[test]
@@ -524,18 +583,20 @@ mod tests {
         let mut variables = HashMap::new();
         variables.insert("a".to_string(), NumericalValue::universe());
         let mut slices = Vec::new();
+        let mut diagnostics = Vec::new();
         // a / 4 == 32
         // a == 128
-        handle_comparison(&Binary { left: Box::new(Identifier("a".to_string())),
+        handle_comparison("pos", &Binary { left: Box::new(Identifier("a".to_string())),
                                     op: "/".to_string(),
                                     right: Box::new(Number(4)), },
-                          "==", &Number(32), &variables, &mut slices);
+                          "==", &Number(32), &variables, &mut slices, &mut diagnostics);
         assert_eq!(slices,
                    vec![VariableValueSlice {
                        name: "a".to_string(),
                        pass: Range::from(BoundedValue::Raw(128)),
                        fail: Range::universe(),
                    }]);
+        assert!(diagnostics.is_empty());
     }
 
     #[test]
@@ -544,18 +605,20 @@ mod tests {
         let mut variables = HashMap::new();
         variables.insert("a".to_string(), NumericalValue::universe());
         let mut slices = Vec::new();
+        let mut diagnostics = Vec::new();
         // 32 / a != 4
         // a != 8
-        handle_comparison(&Binary { left: Box::new(Number(32)),
+        handle_comparison("pos", &Binary { left: Box::new(Number(32)),
                                     op: "/".to_string(),
                                     right: Box::new(Identifier("a".to_string())) },
-                          "!=", &Number(4), &variables, &mut slices);
+                          "!=", &Number(4), &variables, &mut slices, &mut diagnostics);
         assert_eq!(slices,
                    vec![VariableValueSlice {
                        name: "a".to_string(),
                        pass: Range::universe(),
                        fail: Range::from(BoundedValue::Raw(8)),
                    }]);
+        assert!(diagnostics.is_empty());
     }
 
     #[test]
@@ -564,14 +627,15 @@ mod tests {
         let mut variables = HashMap::new();
         variables.insert("a".to_string(), NumericalValue::universe());
         let mut slices = Vec::new();
+        let mut diagnostics = Vec::new();
         // 32 <= a / 4
         // a >= 128
-        handle_comparison(&Number(32),
+        handle_comparison("pos", &Number(32),
                           "<=",
                           &Binary { left: Box::new(Identifier("a".to_string())),
                                     op: "/".to_string(),
                                     right: Box::new(Number(4)), },
-                          &variables, &mut slices);
+                          &variables, &mut slices, &mut diagnostics);
         assert_eq!(slices,
                    vec![VariableValueSlice {
                        name: "a".to_string(),
@@ -580,6 +644,7 @@ mod tests {
                        fail: Range::new(BoundedValue::Min, Inclusivity::Inclusive,
                                         BoundedValue::Raw(128), Inclusivity::Exclusive),
                    }]);
+        assert!(diagnostics.is_empty());
     }
 
     #[test]
@@ -588,20 +653,22 @@ mod tests {
         let mut variables = HashMap::new();
         variables.insert("a".to_string(), NumericalValue::universe());
         let mut slices = Vec::new();
+        let mut diagnostics = Vec::new();
         // 4 != 32 / a
         // a != 8
-        handle_comparison(&Number(4),
+        handle_comparison("pos", &Number(4),
                           "!=",
                           &Binary { left: Box::new(Number(32)),
                                     op: "/".to_string(),
                                     right: Box::new(Identifier("a".to_string())) },
-                          &variables, &mut slices);
+                          &variables, &mut slices, &mut diagnostics);
         assert_eq!(slices,
                    vec![VariableValueSlice {
                        name: "a".to_string(),
                        pass: Range::universe(),
                        fail: Range::from(BoundedValue::Raw(8)),
                    }]);
+        assert!(diagnostics.is_empty());
     }
 
     #[test]
@@ -610,12 +677,13 @@ mod tests {
         let mut variables = HashMap::new();
         variables.insert("a".to_string(), NumericalValue::universe());
         let mut slices = Vec::new();
+        let mut diagnostics = Vec::new();
         // 32 % a < 40
         // a ∈ [0, 40)
-        handle_comparison(&Binary { left: Box::new(Number(32)),
+        handle_comparison("pos", &Binary { left: Box::new(Number(32)),
                                     op: "%".to_string(),
                                     right: Box::new(Identifier("a".to_string())) },
-                          "<", &Number(40), &variables, &mut slices);
+                          "<", &Number(40), &variables, &mut slices, &mut diagnostics);
         assert_eq!(slices,
                    vec![VariableValueSlice {
                        name: "a".to_string(),
@@ -624,6 +692,7 @@ mod tests {
                        fail: Range::new(BoundedValue::Raw(40), Inclusivity::Inclusive,
                                         BoundedValue::Max, Inclusivity::Inclusive),
                    }]);
+        assert!(diagnostics.is_empty());
     }
 
     #[test]
@@ -673,8 +742,10 @@ mod tests {
         let graph = Graph::new(values, successors, "a".to_string());
         let mut variables = HashMap::new();
         let mut history = HashMap::new();
-        numerical_value_analysis(&graph, "a", &mut variables, &mut history);
+        let mut diagnostics = Vec::new();
+        numerical_value_analysis(&graph, "a", &mut variables, &mut history, &mut diagnostics);
         assert_eq!(format!("{:?}", history["d"]["a"]), "[-inf, 13)");
         assert_eq!(format!("{:?}", history["d"]["b"]), "[-inf, inf]");
+        assert!(diagnostics.is_empty());
     }
 }
