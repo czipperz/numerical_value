@@ -1,76 +1,29 @@
-{
-"nodes": [
-{ "key": "SourceFile([292..450))", "value":
-{ "type": "other" }
-,
-"successors": [
-{ "key": "SourceFile([319..329))", "value": -1 }]
-},
-{ "key": "SourceFile([319..329))", "value":
-{ "type": "variable_declaration",
-  "declarations": [
-    { "identifier": "i", "initializer": 0 }
-  ] }
-,
-"successors": [
-{ "key": "SourceFile([335..341))", "value": -1 }]
-},
-{ "key": "SourceFile([335..341))", "value":
-{ "type": "variable_assignment",
-  "left": "i",
-  "right": 3
-}
-,
-"successors": [
-{ "key": "SourceFile([347..359))", "value": -1 }]
-},
-{ "key": "SourceFile([347..359))", "value":
-{ "type": "variable_declaration",
-  "declarations": [
-    { "identifier": "j", "initializer": null }
-  ] }
-,
-"successors": [
-{ "key": "SourceFile([369..378))", "value": -1 }]
-},
-{ "key": "SourceFile([369..378))", "value":
-{ "type": "comparison",
-  "left": { "left": "j", "op": "+", "right": "j" },
-  "op": ">",
-  "right": 5
-}
-,
-"successors": [
-{ "key": "SourceFile([391..397))", "value": 1 }, { "key": "SourceFile([421..427))", "value": 0 }]
-},
-{ "key": "SourceFile([391..397))", "value":
-{ "type": "variable_assignment",
-  "left": "i",
-  "right": "j"
-}
-,
-"successors": [
-{ "key": "SourceFile([440..447))", "value": -1 }]
-},
-{ "key": "SourceFile([440..447))", "value":
-{ "type": "other" }
-,
-"successors": [
-{ "key": "SourceFile([0..7))", "value": -1 }]
-},
-{ "key": "SourceFile([0..7))", "value":
-{ "type": "other" }
-,
-"successors": [
-]
-},
-{ "key": "SourceFile([421..427))", "value":
-{ "type": "variable_assignment",
-  "left": "i",
-  "right": 5
-}
-,
-"successors": [
-{ "key": "SourceFile([440..447))", "value": -1 }]
-}
+{ "nodes": [
+  { "key": "(13,0) - (29,1)",
+    "value": { "type": "other" },
+    "successors": [{ "key": "(14,4) - (14,14)", "value": -1 }] },
+  { "key": "(14,4) - (14,14)",
+    "value": { "type": "variable_declaration", "declarations": [ { "identifier": "j", "initializer": 3 } ] },
+    "successors": [{ "key": "(15,9) - (15,18)", "value": -1 }] },
+  { "key": "(15,9) - (15,18)",
+    "value": { "type": "variable_declaration", "declarations": [ { "identifier": "i", "initializer": 0 } ] },
+    "successors": [{ "key": "(15,20) - (15,26)", "value": -1 }] },
+  { "key": "(15,20) - (15,26)",
+    "value": { "type": "comparison", "left": "i", "op": "<", "right": 10 },
+    "successors": [{ "key": "(16,12) - (16,17)", "value": 1 }, { "key": "(18,4) - (18,11)", "value": 0 }] },
+  { "key": "(16,12) - (16,17)",
+    "value": { "type": "comparison", "left": "i", "op": ">", "right": "j" },
+    "successors": [{ "key": "(16,21) - (16,31)", "value": 1 }, { "key": "(15,28) - (15,37)", "value": 0 }] },
+  { "key": "(16,21) - (16,31)",
+    "value": { "type": "variable_assignment", "left": "j", "right": { "left": "i", "op": "+", "right": 1 } },
+    "successors": [{ "key": "(15,28) - (15,37)", "value": -1 }] },
+  { "key": "(15,28) - (15,37)",
+    "value": { "type": "variable_assignment", "left": "i", "right": { "left": "i", "op": "+", "right": 1 } },
+    "successors": [{ "key": "(15,20) - (15,26)", "value": -1 }] },
+  { "key": "(18,4) - (18,11)",
+    "value": { "type": "other" },
+    "successors": [{ "key": "(0,0) - (0,7)", "value": -1 }] },
+  { "key": "(0,0) - (0,7)",
+    "value": { "type": "other" },
+    "successors": [] }
 ] }
