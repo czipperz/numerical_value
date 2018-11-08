@@ -90,6 +90,48 @@ impl fmt::Debug for Graph {
     }
 }
 
+impl fmt::Display for NodeValue {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use NodeValue::*;
+        match self {
+            VariableDeclaration { declarations } => {
+                for d in declarations {
+                    write!(f, "{};", d)?;
+                }
+                Ok(())
+            },
+            VariableAssignment { left, right } =>
+                write!(f, "{} = {};", left, right),
+            Comparison { left, op, right } =>
+                write!(f, "{} {} {}", left, op, right),
+            Other =>
+                write!(f, "__other_stmt();"),
+        }
+    }
+}
+
+impl fmt::Display for Declaration {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "let {} = {}", self.identifier, self.initializer)
+    }
+}
+
+impl fmt::Display for Expression {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use Expression::*;
+        match self {
+            Binary { left, op, right } =>
+                write!(f, "{} {} {}", left, op, right),
+            Number(num) =>
+                write!(f, "{}", num),
+            Identifier(identifier) =>
+                write!(f, "{}", identifier),
+            Other =>
+                write!(f, "__other_expr()"),
+        }
+    }
+}
+
 pub fn parse() -> io::Result<Graph> {
     parse_contents(read_file()?)
 }

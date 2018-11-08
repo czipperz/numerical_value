@@ -78,7 +78,7 @@ fn numerical_value_analysis(graph: &Graph, location: &str,
         NodeValue::Other => {},
     }
 
-    println!("{} -> {:?}", location, variables);
+    println!("{} -> {:?} ({})", location, variables, node);
 
     for succ in graph.successors_of(location).unwrap() {
         let mut vars = variables.clone();
@@ -150,7 +150,6 @@ fn descend(node: &Expression, range: Range<BoundedValue<i64>>, cmp_op: Compariso
            slices: &mut Vec<VariableValueSlice<BoundedValue<i64>>>) {
     use Expression::*;
     use Inclusivity::*;
-    println!("node {:?} range {:?} cmp_op {:?}", node, range, cmp_op);
     match node {
         Expression::Identifier(name) => {
             use self::ComparisonOperator::*;
@@ -804,7 +803,7 @@ mod tests {
         let mut slices = Vec::new();
         let mut diagnostics = Vec::new();
         // b > 3 + a
-        // [0, 10] > 3 + [2, 12] + 3
+        // [0, 10] > 3 + [2, 12]
         // A_T = [2, 7)
         // A_F = [2, 12]
         // B_T = (5, 10]
