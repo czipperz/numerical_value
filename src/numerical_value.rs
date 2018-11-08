@@ -224,7 +224,7 @@ impl<'a, T: 'a> NumericalValue<T> where T: Ord + Clone {
                             } else {
                                 //  [ ]
                                 // [ ]
-                                new_ranges.insert(Range { min: w.min.clone(), max: r.max.clone() });
+                                new_ranges.insert(Range { min: r.min.clone(), max: w.max.clone() });
                                 working_other = other.next();
                                 continue;
                             }
@@ -580,6 +580,20 @@ mod tests {
             &NumericalValue::new_value(-3, Exclusive, 10, Inclusive)
                 .union_value(-8, Exclusive, -6, Inclusive));
         assert_eq!(format!("{:?}", value), "(-3, 5)");
+    }
+
+    #[test]
+    fn intersect_test_3() {
+        let n1 = NumericalValue::new_value(2, Inclusive, 12, Inclusive);
+        let n2 = NumericalValue::new_value(-100, Inclusive, 10, Exclusive);
+        assert_eq!(format!("{:?}", n1.intersect(&n2)), "[2, 10)");
+    }
+
+    #[test]
+    fn intersect_test_4() {
+        let n1 = NumericalValue::new_value(-100, Inclusive, 10, Exclusive);
+        let n2 = NumericalValue::new_value(2, Inclusive, 12, Inclusive);
+        assert_eq!(format!("{:?}", n1.intersect(&n2)), "[2, 10)");
     }
 
     #[test]
