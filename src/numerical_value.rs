@@ -189,11 +189,11 @@ impl<'a, T: 'a> NumericalValue<T> where T: Ord + Clone {
     }
 
     fn intersect_impl<I>(&self, mut other: I) -> Self where I: Iterator<Item = &'a Range<T>> {
-        let mut working_other = other.next().cloned();
+        let mut working_other = None;
         let mut new_ranges = BTreeSet::<Range<T>>::new();
         for r in self.ranges.iter() {
             if working_other.is_none() {
-                working_other = other.next().cloned();
+                working_other = other.next();
             }
             loop {
                 match working_other.take() {
@@ -204,13 +204,13 @@ impl<'a, T: 'a> NumericalValue<T> where T: Ord + Clone {
                             if r.max > w.max {
                                 // [   ]
                                 //  [ ]
-                                new_ranges.insert(w);
-                                working_other = other.next().cloned();
+                                new_ranges.insert(w.clone());
+                                working_other = other.next();
                                 continue;
                             } else {
                                 // [ ]
                                 //  [ ]
-                                new_ranges.insert(Range { min: w.min, max: r.max.clone() });
+                                new_ranges.insert(Range { min: w.min.clone(), max: r.max.clone() });
                             }
                         }
                         //  [ ]]]
@@ -224,8 +224,8 @@ impl<'a, T: 'a> NumericalValue<T> where T: Ord + Clone {
                             } else {
                                 //  [ ]
                                 // [ ]
-                                new_ranges.insert(Range { min: w.min, max: r.max.clone() });
-                                working_other = other.next().cloned();
+                                new_ranges.insert(Range { min: w.min.clone(), max: r.max.clone() });
+                                working_other = other.next();
                                 continue;
                             }
                         }
@@ -237,7 +237,7 @@ impl<'a, T: 'a> NumericalValue<T> where T: Ord + Clone {
                         //     [ ]
                         // [ ]
                         else {
-                            working_other = other.next().cloned();
+                            working_other = other.next();
                             continue;
                         }
                     },
