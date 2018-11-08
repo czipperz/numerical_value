@@ -24,15 +24,15 @@ struct VariableValueSlice<T> {
     fail: Range<T>
 }
 
-fn numerical_value_analysis(graph: &Graph, node_string: &str,
+fn numerical_value_analysis(graph: &Graph, location: &str,
                             variables: &mut HashMap<String, NumericalValue<BoundedValue<i64>>>,
                             history: &mut HashMap<String, HashMap<String, NumericalValue<BoundedValue<i64>>>>,
                             diagnostics: &mut Vec<Diagnostic>) {
-    let node = graph.value_of(node_string).unwrap();
-    match history.get(node_string) {
-        Some(node_string_history) => {
+    let node = graph.value_of(location).unwrap();
+    match history.get(location) {
+        Some(location_history) => {
             let mut any_changed = false;
-            for (key, value) in node_string_history {
+            for (key, value) in location_history {
                 if variables.contains_key(key) {
                     let (new_var, eq) = {
                         let var = &variables[key];
@@ -49,7 +49,7 @@ fn numerical_value_analysis(graph: &Graph, node_string: &str,
                     any_changed = true;
                 }
             }
-            if history[node_string].is_empty() && !variables.is_empty() {
+            if history[location].is_empty() && !variables.is_empty() {
                 any_changed = true;
             }
             if !any_changed {
@@ -58,7 +58,7 @@ fn numerical_value_analysis(graph: &Graph, node_string: &str,
         },
         None => {}
     }
-    history.insert(node_string.to_string(), variables.clone());
+    history.insert(location.to_string(), variables.clone());
 
     let mut slices = Vec::new();
     match node {
@@ -73,14 +73,14 @@ fn numerical_value_analysis(graph: &Graph, node_string: &str,
             variables.insert(left.clone(), parsed);
         },
         NodeValue::Comparison { left, op, right } => {
-            handle_comparison(node_string, left, op, right, variables, &mut slices, diagnostics);
+            handle_comparison(location, left, op, right, variables, &mut slices, diagnostics);
         },
         NodeValue::Other => {},
     }
 
-    println!("{} -> {:?}", node_string, variables);
+    println!("{} -> {:?}", location, variables);
 
-    for succ in graph.successors_of(node_string).unwrap() {
+    for succ in graph.successors_of(location).unwrap() {
         let mut vars = variables.clone();
         for slice in slices.iter() {
             let new_var = vars[&slice.name].intersect_range(
@@ -145,16 +145,16 @@ impl ComparisonOperator {
     }
 }
 
-fn descend(expr: &Expression, range: Range<BoundedValue<i64>>, cmp_op: ComparisonOperator,
+fn descend(node: &Expression, range: Range<BoundedValue<i64>>, cmp_op: ComparisonOperator,
            variables: &HashMap<String, NumericalValue<BoundedValue<i64>>>,
            slices: &mut Vec<VariableValueSlice<BoundedValue<i64>>>) {
     use Expression::*;
     use Inclusivity::*;
-    println!("expr {:?} range {:?} cmp_op {:?}", expr, range, cmp_op);
-    match expr {
+    println!("node {:?} range {:?} cmp_op {:?}", node, range, cmp_op);
+    match node {
         Expression::Identifier(name) => {
             use self::ComparisonOperator::*;
-            let e = parse_value_expression(expr, variables);
+            let e = parse_value_expression(node, variables);
             let pr;
             let fr;
             match cmp_op {
@@ -267,12 +267,12 @@ fn descend(expr: &Expression, range: Range<BoundedValue<i64>>, cmp_op: Compariso
     }
 }
 
-fn handle_comparison(node_string: &str, left: &Expression, op: &str, right: &Expression,
+fn handle_comparison(location: &str, left: &Expression, cmp_op: &str, right: &Expression,
                      variables: &HashMap<String, NumericalValue<BoundedValue<i64>>>,
                      slices: &mut Vec<VariableValueSlice<BoundedValue<i64>>>,
                      diagnostics: &mut Vec<Diagnostic>) {
     use self::ComparisonOperator::*;
-    let op = match op {
+    let cmp_op = match cmp_op {
         "<" => Less,
         "<=" => LessEqual,
         ">" => Greater,
@@ -285,9 +285,9 @@ fn handle_comparison(node_string: &str, left: &Expression, op: &str, right: &Exp
     let r = parse_value_expression(right, variables);
     let l = l.range().unwrap();
     let r = r.range().unwrap();
-    descend(left, r, op, variables, slices);
-    descend(right, l, op.flip(), variables, slices);
-    let always_true = match op {
+    descend(left, r, cmp_op, variables, slices);
+    descend(right, l, cmp_op.flip(), variables, slices);
+    let always_true = match cmp_op {
         Less => l.max < r.min,
         LessEqual => l.max <= r.min,
         Greater => l.min > r.max,
@@ -295,7 +295,7 @@ fn handle_comparison(node_string: &str, left: &Expression, op: &str, right: &Exp
         Equals => l == r,
         NotEquals => l.max < r.min || l.min > r.max,
     };
-    let always_false = match op {
+    let always_false = match cmp_op {
         Less => l.min > r.max,
         LessEqual => l.min >= r.max,
         Greater => l.max < r.min,
@@ -305,13 +305,13 @@ fn handle_comparison(node_string: &str, left: &Expression, op: &str, right: &Exp
     };
     if always_true {
         diagnostics.push(Diagnostic {
-            location: node_string.to_string(),
+            location: location.to_string(),
             message: "Expression is always true".to_string(),
         });
     }
     if always_false {
         diagnostics.push(Diagnostic {
-            location: node_string.to_string(),
+            location: location.to_string(),
             message: "Expression is always false".to_string(),
         });
     }
