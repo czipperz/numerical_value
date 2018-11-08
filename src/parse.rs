@@ -45,15 +45,6 @@ pub struct Successor {
     pub value: i64,
 }
 
-fn read_file() -> io::Result<String> {
-    use std::env;
-    let mut contents = String::new();
-    let err = io::Error::new(io::ErrorKind::InvalidInput, "No file in argument");
-    File::open(env::args().nth(1).ok_or(err)?)?
-        .read_to_string(&mut contents)?;
-    Ok(contents)
-}
-
 pub struct Graph {
     values: HashMap<String, NodeValue>,
     successors: HashMap<String, Vec<Successor>>,
@@ -132,12 +123,15 @@ impl fmt::Display for Expression {
     }
 }
 
-pub fn parse() -> io::Result<Graph> {
-    parse_contents(read_file()?)
+pub fn parse(path: &str) -> io::Result<Graph> {
+    Ok(parse_(serde_json::from_reader(File::open(path)?)?))
 }
 
 pub fn parse_contents(contents: String) -> io::Result<Graph> {
-    let nodes: Nodes = serde_json::from_str(&contents)?;
+    Ok(parse_(serde_json::from_str(&contents)?))
+}
+
+fn parse_(nodes: Nodes) -> Graph {
     let mut values = HashMap::new();
     let mut successors = HashMap::new();
     let first = nodes.nodes[0].key.clone();
@@ -145,5 +139,5 @@ pub fn parse_contents(contents: String) -> io::Result<Graph> {
         values.insert(node.key.clone(), node.value);
         successors.insert(node.key, node.successors);
     }
-    Ok(Graph { values, successors, first })
+    Graph { values, successors, first }
 }
