@@ -5,7 +5,7 @@ use bounded_value::*;
 extern crate serde;
 extern crate serde_json;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct Diagnostic {
     location: String,
     message: String,
@@ -155,6 +155,8 @@ fn descend(expr: &Expression, range: Range<BoundedValue<i64>>, cmp_op: Compariso
         Expression::Identifier(name) => {
             use self::ComparisonOperator::*;
             let e = parse_value_expression(expr, variables);
+            let pr;
+            let fr;
             match cmp_op {
                 Less => {
                     let (max_v, max_i) =
@@ -163,13 +165,9 @@ fn descend(expr: &Expression, range: Range<BoundedValue<i64>>, cmp_op: Compariso
                         } else {
                             (range.max.value + (-1).into(), Exclusive)
                         };
-                    let pr = Range::new(BoundedValue::Min, Inclusive, max_v, max_i);
-                    let fr = Range::new(range.min.value, range.min.inclusivity, BoundedValue::Max, Inclusive);
-                    slices.push(VariableValueSlice {
-                        name: name.clone(),
-                        pass: e.intersect_range(&pr).range().unwrap(),
-                        fail: e.intersect_range(&fr).range().unwrap(),
-                    })
+                    pr = Range::new(BoundedValue::Min, Inclusive, max_v, max_i);
+                    fr = Range::new(range.min.value, range.min.inclusivity,
+                                    BoundedValue::Max, Inclusive);
                 },
                 LessEqual => {
                     let (min_v, min_i) =
@@ -178,15 +176,10 @@ fn descend(expr: &Expression, range: Range<BoundedValue<i64>>, cmp_op: Compariso
                         } else {
                             (range.min.value + 1.into(), Exclusive)
                         };
-                    slices.push(VariableValueSlice {
-                        name: name.clone(),
-                        pass: e.intersect_range(&Range::new(
-                            BoundedValue::Min, Inclusive,
-                            range.max.value, range.max.inclusivity)).range().unwrap(),
-                        fail: e.intersect_range(&Range::new(
-                            min_v, min_i,
-                            BoundedValue::Max, Inclusive)).range().unwrap(),
-                    })
+                    pr = Range::new(BoundedValue::Min, Inclusive,
+                                    range.max.value, range.max.inclusivity);
+                    fr = Range::new(min_v, min_i,
+                                    BoundedValue::Max, Inclusive);
                 },
                 Greater => {
                     let (min_v, min_i) =
@@ -195,15 +188,10 @@ fn descend(expr: &Expression, range: Range<BoundedValue<i64>>, cmp_op: Compariso
                         } else {
                             (range.min.value + 1.into(), Exclusive)
                         };
-                    slices.push(VariableValueSlice {
-                        name: name.clone(),
-                        pass: e.intersect_range(&Range::new(
-                            min_v, min_i,
-                            BoundedValue::Max, Inclusive)).range().unwrap(),
-                        fail: e.intersect_range(&Range::new(
-                            BoundedValue::Min, Inclusive,
-                            range.max.value, range.max.inclusivity)).range().unwrap(),
-                    })
+                    pr = Range::new(min_v, min_i,
+                                    BoundedValue::Max, Inclusive);
+                    fr = Range::new(BoundedValue::Min, Inclusive,
+                                    range.max.value, range.max.inclusivity);
                 },
                 GreaterEqual => {
                     let (max_v, max_i) =
@@ -212,30 +200,26 @@ fn descend(expr: &Expression, range: Range<BoundedValue<i64>>, cmp_op: Compariso
                         } else {
                             (range.max.value + (-1).into(), Exclusive)
                         };
-                    slices.push(VariableValueSlice {
-                        name: name.clone(),
-                        pass: e.intersect_range(&Range::new(
-                            range.min.value, range.min.inclusivity,
-                            BoundedValue::Max, Inclusive)).range().unwrap(),
-                        fail: e.intersect_range(&Range::new(
-                            BoundedValue::Min, Inclusive,
-                            max_v, max_i)).range().unwrap(),
-                    })
+                    pr = Range::new(range.min.value, range.min.inclusivity,
+                                    BoundedValue::Max, Inclusive);
+                    fr = Range::new(BoundedValue::Min, Inclusive,
+                                    max_v, max_i);
                 },
                 Equals => {
-                    slices.push(VariableValueSlice {
-                        name: name.clone(),
-                        pass: e.intersect_range(&range).range().unwrap(),
-                        fail: e.range().unwrap(),
-                    })
+                    pr = range;
+                    fr = Range::universe();
                 },
                 NotEquals => {
-                    slices.push(VariableValueSlice {
-                        name: name.clone(),
-                        pass: e.range().unwrap(),
-                        fail: e.intersect_range(&range).range().unwrap(),
-                    })
+                    pr = Range::universe();
+                    fr = range;
                 }
+            }
+            match (e.intersect_range(&pr).range(), e.intersect_range(&fr).range()) {
+                (Some(pass), Some(fail)) =>
+                    slices.push(VariableValueSlice {
+                        name: name.clone(), pass, fail,
+                    }),
+                _ => {},
             }
         },
         Expression::Binary { left, op, right } => {
@@ -766,7 +750,6 @@ mod tests {
         assert!(diagnostics.is_empty());
     }
 
-
     #[test]
     fn handle_comparison_15() {
         use Expression::*;
@@ -806,6 +789,131 @@ mod tests {
                                         BoundedValue::Raw(10), Inclusivity::Inclusive),
                    }]);
         assert!(diagnostics.is_empty());
+    }
+
+    #[test]
+    fn handle_comparison_16() {
+        use Expression::*;
+        let mut variables = HashMap::new();
+        variables.insert("a".to_string(), NumericalValue::from(Range::new(
+            BoundedValue::Raw(2), Inclusivity::Inclusive,
+            BoundedValue::Raw(12), Inclusivity::Inclusive)));
+        variables.insert("b".to_string(), NumericalValue::from(Range::new(
+            BoundedValue::Raw(0), Inclusivity::Inclusive,
+            BoundedValue::Raw(10), Inclusivity::Inclusive)));
+        let mut slices = Vec::new();
+        let mut diagnostics = Vec::new();
+        // b > 3 + a
+        // [0, 10] > 3 + [2, 12] + 3
+        // A_T = [2, 7)
+        // A_F = [2, 12]
+        // B_T = (5, 10]
+        // B_F = [0, 10]
+        handle_comparison("pos", &Identifier("b".to_string()), ">",
+                          &Binary { left: Box::new(Number(3)),
+                                    op: "+".to_string(),
+                                    right: Box::new(Identifier("a".to_string())) },
+                          &variables, &mut slices, &mut diagnostics);
+        assert_eq!(slices,
+                   vec![VariableValueSlice {
+                       name: "b".to_string(),
+                       pass: Range::new(BoundedValue::Raw(5), Inclusivity::Exclusive,
+                                        BoundedValue::Raw(10), Inclusivity::Inclusive),
+                       fail: Range::new(BoundedValue::Raw(0), Inclusivity::Inclusive,
+                                        BoundedValue::Raw(10), Inclusivity::Inclusive),
+                   },
+                   VariableValueSlice {
+                       name: "a".to_string(),
+                       pass: Range::new(BoundedValue::Raw(2), Inclusivity::Inclusive,
+                                        BoundedValue::Raw(7), Inclusivity::Exclusive),
+                       fail: Range::new(BoundedValue::Raw(2), Inclusivity::Inclusive,
+                                        BoundedValue::Raw(12), Inclusivity::Inclusive),
+                   }]);
+        assert!(diagnostics.is_empty());
+    }
+
+    #[test]
+    fn handle_comparison__creates_diagnostics_1() {
+        use Expression::*;
+        let mut variables = HashMap::new();
+        variables.insert("a".to_string(), NumericalValue::from(BoundedValue::Raw(2)));
+        variables.insert("b".to_string(), NumericalValue::from(BoundedValue::Raw(10)));
+        let mut slices = Vec::new();
+        let mut diagnostics = Vec::new();
+        handle_comparison("pos", &Identifier("a".to_string()),
+                          "<", &Identifier("b".to_string()),
+                          &variables, &mut slices, &mut diagnostics);
+        assert!(slices.is_empty());
+        assert_eq!(diagnostics,
+                   vec![Diagnostic {
+                       location: "pos".to_string(),
+                       message: "Expression is always true".to_string(),
+                   }]);
+    }
+
+    #[test]
+    fn handle_comparison__creates_diagnostics_2() {
+        use Expression::*;
+        let mut variables = HashMap::new();
+        variables.insert("a".to_string(), NumericalValue::from(BoundedValue::Raw(2)));
+        variables.insert("b".to_string(), NumericalValue::from(BoundedValue::Raw(10)));
+        let mut slices = Vec::new();
+        let mut diagnostics = Vec::new();
+        handle_comparison("pos", &Identifier("a".to_string()),
+                          ">", &Identifier("b".to_string()),
+                          &variables, &mut slices, &mut diagnostics);
+        assert!(slices.is_empty());
+        assert_eq!(diagnostics,
+                   vec![Diagnostic {
+                       location: "pos".to_string(),
+                       message: "Expression is always false".to_string(),
+                   }]);
+    }
+
+    #[test]
+    fn handle_comparison__creates_diagnostics_3() {
+        use Expression::*;
+        let mut variables = HashMap::new();
+        variables.insert("a".to_string(), NumericalValue::new_value(
+            BoundedValue::Raw(2), Inclusivity::Inclusive,
+            BoundedValue::Raw(7), Inclusivity::Exclusive));
+        variables.insert("b".to_string(), NumericalValue::from(BoundedValue::Raw(10)));
+        let mut slices = Vec::new();
+        let mut diagnostics = Vec::new();
+        handle_comparison("pos", &Binary { left: Box::new(Identifier("a".to_string())),
+                                           op: "+".to_string(),
+                                           right: Box::new(Number(3)) },
+                          "<", &Identifier("b".to_string()),
+                          &variables, &mut slices, &mut diagnostics);
+        assert!(slices.is_empty());
+        assert_eq!(diagnostics,
+                   vec![Diagnostic {
+                       location: "pos".to_string(),
+                       message: "Expression is always true".to_string(),
+                   }]);
+    }
+
+    #[test]
+    fn handle_comparison__creates_diagnostics_4() {
+        use Expression::*;
+        let mut variables = HashMap::new();
+        variables.insert("a".to_string(), NumericalValue::new_value(
+            BoundedValue::Raw(2), Inclusivity::Inclusive,
+            BoundedValue::Raw(7), Inclusivity::Exclusive));
+        variables.insert("b".to_string(), NumericalValue::from(BoundedValue::Raw(10)));
+        let mut slices = Vec::new();
+        let mut diagnostics = Vec::new();
+        handle_comparison("pos", &Binary { left: Box::new(Identifier("a".to_string())),
+                                           op: "+".to_string(),
+                                           right: Box::new(Number(3)) },
+                          "==", &Identifier("b".to_string()),
+                          &variables, &mut slices, &mut diagnostics);
+        assert!(slices.is_empty());
+        assert_eq!(diagnostics,
+                   vec![Diagnostic {
+                       location: "pos".to_string(),
+                       message: "Expression is always false".to_string(),
+                   }]);
     }
 
     #[test]
