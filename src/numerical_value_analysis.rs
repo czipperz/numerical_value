@@ -8,7 +8,7 @@ extern crate serde_json;
 #[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct Diagnostic {
     location: String,
-    message: String,
+    always_true: bool,
 }
 
 pub fn analyze(graph: &Graph) -> Vec<Diagnostic> {
@@ -305,13 +305,13 @@ fn handle_comparison(location: &str, left: &Expression, cmp_op: &str, right: &Ex
     if always_true {
         diagnostics.push(Diagnostic {
             location: location.to_string(),
-            message: "Expression is always true".to_string(),
+            always_true: true,
         });
     }
     if always_false {
         diagnostics.push(Diagnostic {
             location: location.to_string(),
-            message: "Expression is always false".to_string(),
+            always_true: false,
         });
     }
 }
