@@ -1,0 +1,18 @@
+[
+  {
+    "location": "(15,20) - (15,26)",
+    "always_true": true
+  },
+  {
+    "location": "(16,12) - (16,17)",
+    "always_true": false
+  },
+  {
+    "location": "(15,20) - (15,26)",
+    "always_true": true
+  },
+  {
+    "location": "(15,20) - (15,26)",
+    "always_true": true
+  }
+]
